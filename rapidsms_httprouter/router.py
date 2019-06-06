@@ -5,7 +5,8 @@ from rapidsms.models import Backend, Connection
 from rapidsms.apps.base import AppBase
 from rapidsms.messages.incoming import IncomingMessage
 from rapidsms.messages.outgoing import OutgoingMessage
-from rapidsms.log.mixin import LoggerMixin
+from rapidsms.router.blocking import BlockingRouter
+from logger_mixin import LoggerMixin
 from threading import Lock, Thread
 
 from urllib import quote_plus
@@ -15,7 +16,7 @@ import re
 import datetime
 import traceback
 
-class HttpRouter(object, LoggerMixin):
+class HttpRouter(BlockingRouter, LoggerMixin):
     """
     This is a simplified version of the normal SMS router in that it has no threading.  Instead
     it is expected that the handle_incoming and handle_outcoming calls are made in the HTTP
@@ -24,9 +25,8 @@ class HttpRouter(object, LoggerMixin):
     incoming_phases = ("filter", "parse", "handle", "default", "cleanup")
     outgoing_phases = ("outgoing",)
 
-    def __init__(self):
-        # the apps we'll run through
-        self.apps = []
+    def __init__(self, *args, **kwargs):
+        super(HttpRouter, self).__init__(*args, **kwargs)
 
         # we need to be started
         self.started = False
@@ -169,6 +169,22 @@ class HttpRouter(object, LoggerMixin):
 
         return db_message
 
+    def new_incoming_message(self, connections, text, **kwargs):
+        """Create and attach database message to message object."""
+
+        msg = super(HttpRouter, self).new_incoming_message(connections, text, **kwargs)
+
+        # create our db message for logging
+        db_message = self.add_message(connections[0].backend, connections[0].identity, text, 'I', 'R')
+
+        # and our rapidsms transient message for processing
+        msg = IncomingMessage(connections, text, db_message.date)
+
+        # add an extra property to IncomingMessage, so httprouter-aware
+        # apps can make use of it during the handling phase
+        msg.db_message = db_message
+
+        return msg
 
     def add_outgoing(self, connection, text, source=None, status='Q'):
         """
@@ -213,7 +229,7 @@ class HttpRouter(object, LoggerMixin):
         called with the message.  In that case this method will also return False
         """
         # create a RapidSMS outgoing message
-        msg = OutgoingMessage(outgoing.connection, outgoing.text.replace('%','%%'))
+        msg = OutgoingMessage([outgoing.connection], outgoing.text.replace('%','%%'))
         msg.db_message = outgoing
         
         send_msg = True
@@ -261,33 +277,33 @@ class HttpRouter(object, LoggerMixin):
             m = getattr(m, comp)
         return m
 
-    def add_app(self, module_name):
-        """
-        Find the app named *module_name*, instantiate it, and add it to
-        the list of apps to be notified of incoming messages. Return the
-        app instance.
-        """
-        cls = None
-        try:
-            cls = AppBase.find(module_name)
-        except Exception as e:
-            traceback.print_exc(e)
-
-        # couldn't find the app, is it a class name instead?
-        if not cls:
-            try:
-                cls = HttpRouter.definition_from_string(module_name)
-            except Exception as ee:
-                traceback.print_exc(ee)
-
-        # still no dice, warn the user
-        if not cls:
-            self.error("Unable to find SMS application with module: '%s'" % module_name)
-            return None
-
-        app = cls(self)
-        self.apps.append(app)
-        return app
+    # def add_app(self, module_name):
+    #     """
+    #     Find the app named *module_name*, instantiate it, and add it to
+    #     the list of apps to be notified of incoming messages. Return the
+    #     app instance.
+    #     """
+    #     cls = None
+    #     try:
+    #         cls = AppBase.find(module_name)
+    #     except Exception as e:
+    #         traceback.print_exc(e)
+    #
+    #     # couldn't find the app, is it a class name instead?
+    #     if not cls:
+    #         try:
+    #             cls = HttpRouter.definition_from_string(module_name)
+    #         except Exception as ee:
+    #             traceback.print_exc(ee)
+    #
+    #     # still no dice, warn the user
+    #     if not cls:
+    #         self.error("Unable to find SMS application with module: '%s'" % module_name)
+    #         return None
+    #
+    #     app = cls(self)
+    #     self.apps.append(app)
+    #     return app
 
 
     def start(self):
@@ -311,8 +327,8 @@ class HttpRouter(object, LoggerMixin):
         self.started = True
         
 # we'll get started when we first get used
-http_router = HttpRouter()
-http_router_lock = Lock()
+# http_router = HttpRouter()
+# http_router_lock = Lock()
 
 def get_router():
     """

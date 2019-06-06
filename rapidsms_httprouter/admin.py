@@ -1,4 +1,4 @@
-from django.conf.urls.defaults import *
+from django.conf.urls import *
 from django.contrib import admin
 from django.core.urlresolvers import reverse
 from django import forms
@@ -10,7 +10,7 @@ class MessageAdmin(admin.ModelAdmin):
 
     def get_urls(self):
         urls = super(MessageAdmin, self).get_urls()
-        console_urls = patterns('', (r'^send/$', self.admin_site.admin_view(self.send), {}, 'rapidsms_httprouter_message_send'))
+        console_urls = [url(r'^send/$', self.admin_site.admin_view(self.send), {}, 'rapidsms_httprouter_message_send')]
         return console_urls + urls
 
     class SendForm(forms.Form):
