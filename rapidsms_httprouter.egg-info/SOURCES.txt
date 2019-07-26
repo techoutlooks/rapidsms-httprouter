@@ -3,6 +3,7 @@ README.rst
 setup.py
 rapidsms_httprouter/__init__.py
 rapidsms_httprouter/admin.py
+rapidsms_httprouter/logger_mixin.py
 rapidsms_httprouter/models.py
 rapidsms_httprouter/router.py
 rapidsms_httprouter/tasks.py
@@ -17,9 +18,6 @@ rapidsms_httprouter.egg-info/not-zip-safe
 rapidsms_httprouter.egg-info/requires.txt
 rapidsms_httprouter.egg-info/top_level.txt
 rapidsms_httprouter/migrations/0001_initial.py
-rapidsms_httprouter/migrations/0002_auto__add_field_message_updated.py
-rapidsms_httprouter/migrations/0003_auto__add_deliveryerror__add_field_message_sent__add_field_message_del.py
-rapidsms_httprouter/migrations/0004_auto__add_field_message_external_id.py
 rapidsms_httprouter/migrations/__init__.py
 rapidsms_httprouter/static/rapidsms_httprouter/in.png
 rapidsms_httprouter/static/rapidsms_httprouter/nav-bg.gif

@@ -172,13 +172,10 @@ class HttpRouter(BlockingRouter, LoggerMixin):
     def new_incoming_message(self, connections, text, **kwargs):
         """Create and attach database message to message object."""
 
-        msg = super(HttpRouter, self).new_incoming_message(connections, text, **kwargs)
+        msg = super(HttpRouter, self).new_incoming_message(text, connections, **kwargs)
 
         # create our db message for logging
         db_message = self.add_message(connections[0].backend, connections[0].identity, text, 'I', 'R')
-
-        # and our rapidsms transient message for processing
-        msg = IncomingMessage(connections, text, db_message.date)
 
         # add an extra property to IncomingMessage, so httprouter-aware
         # apps can make use of it during the handling phase

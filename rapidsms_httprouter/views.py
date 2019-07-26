@@ -3,7 +3,7 @@ import json
 from django import forms
 from django.http import HttpResponse
 from django.template import RequestContext
-from django.shortcuts import render_to_response
+from django.shortcuts import render
 from django.conf import settings
 from django.db.models import Q
 from django.core.paginator import *
@@ -85,9 +85,9 @@ def relaylog(request):
     """
     password = getattr(settings, "ROUTER_PASSWORD", None)
 
-    if request.method == 'POST' and 'log' in request.REQUEST and 'password' in request.REQUEST and request.REQUEST['password'] == password:
+    if request.method == 'POST' and 'log' in request.POST and 'password' in request.POST and request.POST['password'] == password:
         send_mail('Relay Log',
-                  request.REQUEST['log'], settings.DEFAULT_FROM_EMAIL,
+                  request.POST['log'], settings.DEFAULT_FROM_EMAIL,
                   [admin[1] for admin in settings.ADMINS], fail_silently=False)
 
         return HttpResponse("Log Sent")
@@ -102,10 +102,10 @@ def alert(request):
     """
     password = getattr(settings, "ROUTER_PASSWORD", None)
 
-    if request.method == 'POST' and 'body' in request.REQUEST and 'subject' in request.REQUEST:
-        if not password or request.REQUEST.get('password', None) == password:
-            send_mail(request.REQUEST['subject'],
-                      request.REQUEST['body'], settings.DEFAULT_FROM_EMAIL,
+    if request.method == 'POST' and 'body' in request.POST and 'subject' in request.POST:
+        if not password or request.POST.get('password', None) == password:
+            send_mail(request.POST['subject'],
+                      request.POST['body'], settings.DEFAULT_FROM_EMAIL,
                       [admin[1] for admin in settings.ADMINS], fail_silently=False)
 
             return HttpResponse("Log Sent")
@@ -191,7 +191,7 @@ def status(request):
     fifteen_minutes_ago = timezone.now() - datetime.timedelta(minutes=15)
     pending_count = Message.objects.filter(status='Q', date__lte=fifteen_minutes_ago).count()
 
-    return render_to_response("router/status.html", dict(pending_count=pending_count),context_instance=RequestContext(request))
+    return render(request, "router/status.html", dict(pending_count=pending_count))
 
 def console(request):
     """
@@ -205,7 +205,7 @@ def console(request):
     queryset = Message.objects.all()
 
     if request.method == 'POST':
-        if request.REQUEST['action'] == 'test':
+        if request.POST['action'] == 'test':
             form = SendForm(request.POST)
             if form.is_valid():
                 backend = "console"
@@ -214,7 +214,7 @@ def console(request):
                                                        form.cleaned_data['text'])
             reply_form = ReplyForm()
 
-        elif request.REQUEST['action'] == 'reply':
+        elif request.POST['action'] == 'reply':
             reply_form = ReplyForm(request.POST)
             if reply_form.is_valid():
                 if Connection.objects.filter(identity=reply_form.cleaned_data['recipient']).count():
@@ -226,9 +226,9 @@ def console(request):
                     reply_form.errors.setdefault('short_description', ErrorList())
                     reply_form.errors['recipient'].append("This number isn't in the system")
 
-    if request.REQUEST.get('action', None) == 'search':
+    if request.GET.get('action', None) == 'search':
         # split on spaces
-        search_form = SearchForm(request.REQUEST)
+        search_form = SearchForm(request.GET)
         if search_form.is_valid():
             terms = search_form.cleaned_data['search'].split()
 
@@ -241,7 +241,7 @@ def console(request):
                 queryset = queryset.filter(query)
 
     paginator = Paginator(queryset.order_by('-id'), 20)
-    page = request.REQUEST.get('page')
+    page = request.GET.get('page')
     try:
         messages = paginator.page(page)
     except EmptyPage:
@@ -251,12 +251,13 @@ def console(request):
         # None or not an integer, default to first page
         messages = paginator.page(1)
 
-    return render_to_response(
+    return render(
+        request,
         "router/index.html", {
             "messages_table": MessageTable(queryset, request=request),
             "form": form,
             "reply_form": reply_form,
             "search_form": search_form,
             "sms_messages": messages
-        }, context_instance=RequestContext(request)
+        }
     )
